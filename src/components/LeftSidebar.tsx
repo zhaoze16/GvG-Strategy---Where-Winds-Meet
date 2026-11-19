@@ -34,6 +34,10 @@ interface LeftSidebarProps {
   onDeploySquad: (teamKey: string, members: Player[]) => void;
   onRecallSquad: (teamKey: string, members: Player[]) => void;
   onRenameTeam: (teamKey: string, newName: string) => void;
+  onCreateTeam: (name: string) => void;
+  onDeleteTeam: (teamKey: string) => void;
+  onAssignPlayerToTeam: (playerId: string, teamKey: string) => void;
+  onRemovePlayerFromTeam: (playerId: string) => void;
   onToolModeChange: (mode: ToolMode) => void;
   onColorChange: (hex: string) => void;
   onUndoAnnotation: () => void;
@@ -74,6 +78,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onDeploySquad,
   onRecallSquad,
   onRenameTeam,
+  onCreateTeam,
+  onDeleteTeam,
+  onAssignPlayerToTeam,
+  onRemovePlayerFromTeam,
   onToolModeChange,
   onColorChange,
   onUndoAnnotation,
@@ -84,6 +92,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const [unitSearch, setUnitSearch] = useState('');
   const [editingTeamKey, setEditingTeamKey] = useState<string | null>(null);
   const [teamDraftName, setTeamDraftName] = useState('');
+  const [newTeamName, setNewTeamName] = useState('');
+  const [addingToTeamKey, setAddingToTeamKey] = useState<string | null>(null);
+  const [memberPickSearch, setMemberPickSearch] = useState('');
   const quickFileInputRef = useRef<HTMLInputElement>(null);
   const quickTargetTypeRef = useRef<MapIconType | null>(null);
 
@@ -107,6 +118,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   const groupedSquads = useMemo(() => {
     const map = new Map<string, Player[]>();
+    Object.keys(teamNames).forEach((key) => {
+      const trimmed = key.trim();
+      if (trimmed && trimmed !== 'Unassigned') {
+        map.set(trimmed, []);
+      }
+    });
     players.forEach((p) => {
       const key = p.team.trim() || 'Unassigned';
       const list = map.get(key) ?? [];
@@ -121,7 +138,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       return a.localeCompare(b);
     });
     return entries;
-  }, [players]);
+  }, [players, teamNames]);
 
   const startDragIcon = (e: React.DragEvent, type: MapIconType) => {
     e.dataTransfer.setData('application/gvg-icon', type);
@@ -438,18 +455,47 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 Teams &amp; Squad Assignment
               </h2>
               <p className="mt-0.5 text-xs text-slate-400">
-                Deploy places the team name on the map. Click the team name on the map to spread all members around it.
+                Create teams, add or remove members directly, and click Deploy to place the team name on the map.
               </p>
             </div>
 
+            {/* Quick Create Team Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = newTeamName.trim();
+                if (!trimmed) return;
+                onCreateTeam(trimmed);
+                setNewTeamName('');
+              }}
+              className="flex items-center gap-1.5"
+            >
+              <input
+                type="text"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+                placeholder="New Team / Squad name..."
+                className="min-w-0 flex-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!newTeamName.trim()}
+                className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-40 transition-colors cursor-pointer"
+              >
+                <i className="fa-solid fa-plus text-[10px]" aria-hidden="true" />
+                <span>Add Team</span>
+              </button>
+            </form>
+
             {groupedSquads.length === 0 ? (
               <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-center text-xs text-slate-400">
-                Roster is empty. Add players in Manage Roster.
+                No teams or roster members yet. Create a team above or add players in Manage Roster.
               </div>
             ) : (
               groupedSquads.map(([teamKey, members]) => {
                 const displayName = teamNames[teamKey] || teamKey;
                 const isEditing = editingTeamKey === teamKey;
+                const isAddingMember = addingToTeamKey === teamKey;
                 const onMapCount = members.filter((m) => placedPlayerIds.has(m.id)).length;
                 const deployedSquad = placedSquads.find((s) => s.teamKey === teamKey);
                 const roleCounts = {
@@ -458,6 +504,26 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   DPS: members.filter((m) => m.role === 'DPS').length,
                   Support: members.filter((m) => m.role === 'Support').length,
                 };
+
+                const availableCandidates = isAddingMember
+                  ? players
+                      .filter((p) => (p.team.trim() || 'Unassigned') !== teamKey)
+                      .filter((p) => {
+                        const q = memberPickSearch.trim().toLowerCase();
+                        if (!q) return true;
+                        return (
+                          p.name.toLowerCase().includes(q) ||
+                          p.role.toLowerCase().includes(q) ||
+                          (p.team || 'Unassigned').toLowerCase().includes(q)
+                        );
+                      })
+                      .sort((a, b) => {
+                        const aUnassigned = !a.team.trim() ? 0 : 1;
+                        const bUnassigned = !b.team.trim() ? 0 : 1;
+                        if (aUnassigned !== bUnassigned) return aUnassigned - bUnassigned;
+                        return a.name.localeCompare(b.name);
+                      })
+                  : [];
 
                 return (
                   <div
@@ -494,17 +560,30 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                             {displayName}
                           </h3>
                           {teamKey !== 'Unassigned' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingTeamKey(teamKey);
-                                setTeamDraftName(displayName);
-                              }}
-                              title="Rename squad display name"
-                              className="text-slate-500 hover:text-amber-400 transition-colors cursor-pointer"
-                            >
-                              <i className="fa-solid fa-pen text-[10px]" aria-hidden="true" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingTeamKey(teamKey);
+                                  setTeamDraftName(displayName);
+                                }}
+                                title="Rename squad display name"
+                                className="text-slate-500 hover:text-amber-400 transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-pen text-[10px]" aria-hidden="true" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (addingToTeamKey === teamKey) setAddingToTeamKey(null);
+                                  onDeleteTeam(teamKey);
+                                }}
+                                title={`Delete ${displayName} (moves members to Unassigned)`}
+                                className="text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-trash-can text-[10px]" aria-hidden="true" />
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
@@ -525,33 +604,133 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                       <span className="text-sky-300">S:{roleCounts.Support}</span>
                     </div>
 
-                    {/* Members compact list */}
-                    <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
-                      {members.map((m) => {
-                        const rMeta = ROLE_META[m.role];
-                        return (
-                          <div
-                            key={m.id}
-                            className="flex items-center justify-between text-xs py-0.5 border-b border-slate-900 last:border-0"
-                          >
-                            <span className="truncate text-slate-200">{m.name}</span>
-                            <span
-                              className="text-[11px] font-medium shrink-0 ml-2"
-                              style={{ color: rMeta.textHex }}
+                    {/* Members compact list with instant remove button */}
+                    {members.length === 0 ? (
+                      <div className="rounded border border-dashed border-slate-800 px-2.5 py-2 text-[11px] text-slate-500">
+                        No members yet. Click &ldquo;+ Add Member&rdquo; below to assign players.
+                      </div>
+                    ) : (
+                      <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                        {members.map((m) => {
+                          const rMeta = ROLE_META[m.role];
+                          return (
+                            <div
+                              key={m.id}
+                              className="group flex items-center justify-between gap-2 text-xs py-0.5 border-b border-slate-900 last:border-0"
                             >
-                              {m.role}
-                            </span>
+                              <span className="truncate text-slate-200">{m.name}</span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span
+                                  className="text-[11px] font-medium"
+                                  style={{ color: rMeta.textHex }}
+                                >
+                                  {m.role}
+                                </span>
+                                {teamKey !== 'Unassigned' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onRemovePlayerFromTeam(m.id)}
+                                    title={`Remove ${m.name} from ${displayName}`}
+                                    aria-label={`Remove ${m.name} from ${displayName}`}
+                                    className="flex h-4 w-4 items-center justify-center rounded text-slate-500 hover:bg-rose-950/70 hover:text-rose-300 transition-colors cursor-pointer"
+                                  >
+                                    <i className="fa-solid fa-xmark text-[10px]" aria-hidden="true" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Inline Add Member Picker */}
+                    {teamKey !== 'Unassigned' && (
+                      isAddingMember ? (
+                        <div className="rounded-md border border-slate-700 bg-slate-900/95 p-2 space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={memberPickSearch}
+                              onChange={(e) => setMemberPickSearch(e.target.value)}
+                              placeholder="Search player to add..."
+                              autoFocus
+                              className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddingToTeamKey(null);
+                                setMemberPickSearch('');
+                              }}
+                              className="shrink-0 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-300 hover:text-white cursor-pointer"
+                            >
+                              Done
+                            </button>
                           </div>
-                        );
-                      })}
-                    </div>
+
+                          <div className="max-h-36 overflow-y-auto space-y-0.5 pr-0.5">
+                            {availableCandidates.length === 0 ? (
+                              <div className="py-2 text-center text-[11px] text-slate-500">
+                                No available players match.
+                              </div>
+                            ) : (
+                              availableCandidates.map((cand) => {
+                                const cMeta = ROLE_META[cand.role];
+                                const curTeam = cand.team.trim() || 'Unassigned';
+                                return (
+                                  <button
+                                    key={cand.id}
+                                    type="button"
+                                    onClick={() => onAssignPlayerToTeam(cand.id, teamKey)}
+                                    className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-[11px] text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+                                  >
+                                    <span className="flex min-w-0 items-center gap-1.5">
+                                      <i
+                                        className="fa-solid fa-plus text-[9px] text-emerald-400 shrink-0"
+                                        aria-hidden="true"
+                                      />
+                                      <span className="truncate font-medium">{cand.name}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5 shrink-0">
+                                      <span style={{ color: cMeta.textHex }}>{cand.role}</span>
+                                      <span className="text-[10px] text-slate-500">
+                                        ({curTeam})
+                                      </span>
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddingToTeamKey(teamKey);
+                            setMemberPickSearch('');
+                          }}
+                          className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-700 bg-slate-900/50 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:border-amber-500/60 hover:text-amber-300 transition-colors cursor-pointer"
+                        >
+                          <i className="fa-solid fa-user-plus text-[10px]" aria-hidden="true" />
+                          <span>Add Member</span>
+                        </button>
+                      )
+                    )}
 
                     {/* Deploy & Recall Buttons */}
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex items-center gap-2 pt-0.5">
                       <button
                         type="button"
+                        disabled={members.length === 0}
                         onClick={() => onDeploySquad(teamKey, members)}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 transition-colors whitespace-nowrap cursor-pointer"
+                        title={
+                          members.length === 0
+                            ? 'Add at least 1 member before deploying'
+                            : undefined
+                        }
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-40 transition-colors whitespace-nowrap cursor-pointer"
                       >
                         <i className="fa-solid fa-bullseye" aria-hidden="true" />
                         <span>

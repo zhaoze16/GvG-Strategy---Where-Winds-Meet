@@ -582,6 +582,150 @@ export default function App() {
     }));
   }, []);
 
+  const handleCreateTeam = useCallback(
+    (rawName: string) => {
+      const trimmed = rawName.trim();
+      if (!trimmed || trimmed.toLowerCase() === 'unassigned') return;
+
+      const exists =
+        Object.keys(state.teamNames).some(
+          (k) => k.trim().toLowerCase() === trimmed.toLowerCase()
+        ) ||
+        state.players.some((p) => p.team.trim().toLowerCase() === trimmed.toLowerCase());
+
+      if (exists) {
+        showToast(`Team "${trimmed}" already exists.`);
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        teamNames: {
+          ...prev.teamNames,
+          [trimmed]: trimmed,
+        },
+      }));
+      showToast(`Team "${trimmed}" created.`);
+    },
+    [showToast, state.players, state.teamNames]
+  );
+
+  const handleDeleteTeam = useCallback(
+    (teamKey: string) => {
+      if (teamKey === 'Unassigned') return;
+      const displayName = state.teamNames[teamKey] || teamKey;
+
+      setState((prev) => {
+        const nextTeamNames = { ...prev.teamNames };
+        delete nextTeamNames[teamKey];
+
+        const squad = prev.placedSquads.find((s) => s.teamKey === teamKey);
+        const memberIds = new Set(
+          prev.players
+            .filter((p) => (p.team.trim() || 'Unassigned') === teamKey)
+            .map((p) => p.id)
+        );
+
+        return {
+          ...prev,
+          teamNames: nextTeamNames,
+          players: prev.players.map((p) =>
+            memberIds.has(p.id) ? { ...p, team: '' } : p
+          ),
+          placedSquads: prev.placedSquads.filter((s) => s.teamKey !== teamKey),
+          placedPlayers: squad?.isExpanded
+            ? prev.placedPlayers.filter((p) => !memberIds.has(p.playerId))
+            : prev.placedPlayers.map((p) =>
+                memberIds.has(p.playerId) ? { ...p, team: '' } : p
+              ),
+        };
+      });
+
+      showToast(`Team "${displayName}" removed; members moved to Unassigned.`);
+    },
+    [showToast, state.teamNames]
+  );
+
+  const handleAssignPlayerToTeam = useCallback((playerId: string, teamKey: string) => {
+    setState((prev) => {
+      const nextPlayers = prev.players.map((p) =>
+        p.id === playerId ? { ...p, team: teamKey } : p
+      );
+      let nextPlaced = prev.placedPlayers.map((p) =>
+        p.playerId === playerId ? { ...p, team: teamKey } : p
+      );
+
+      const expandedSquad = prev.placedSquads.find(
+        (s) => s.teamKey === teamKey && s.isExpanded
+      );
+      if (expandedSquad) {
+        const squadMembers = nextPlayers.filter(
+          (p) => (p.team.trim() || 'Unassigned') === teamKey
+        );
+        const count = squadMembers.length;
+        const radius = count <= 1 ? 44 : Math.min(100, Math.max(50, 40 + count * 5));
+
+        squadMembers.forEach((member, idx) => {
+          const angle = (2 * Math.PI * idx) / Math.max(1, count) - Math.PI / 2;
+          const tx = Math.max(
+            36,
+            Math.min(CANVAS_WIDTH - 36, Math.round(expandedSquad.x + radius * Math.cos(angle)))
+          );
+          const ty = Math.max(
+            36,
+            Math.min(CANVAS_HEIGHT - 36, Math.round(expandedSquad.y + radius * Math.sin(angle)))
+          );
+          const existingIdx = nextPlaced.findIndex((p) => p.playerId === member.id);
+          if (existingIdx >= 0) {
+            nextPlaced[existingIdx] = { ...nextPlaced[existingIdx], team: teamKey, x: tx, y: ty };
+          } else {
+            nextPlaced.push({
+              id: `token-${member.id}-${Date.now()}-${idx}`,
+              playerId: member.id,
+              name: member.name,
+              role: member.role,
+              team: member.team,
+              weapon1: member.weapon1,
+              weapon2: member.weapon2,
+              path1: member.path1,
+              path2: member.path2,
+              x: tx,
+              y: ty,
+            });
+          }
+        });
+      }
+
+      return {
+        ...prev,
+        players: nextPlayers,
+        placedPlayers: nextPlaced,
+      };
+    });
+  }, []);
+
+  const handleRemovePlayerFromTeam = useCallback((playerId: string) => {
+    setState((prev) => {
+      const target = prev.players.find((p) => p.id === playerId);
+      const oldTeamKey = target ? target.team.trim() || 'Unassigned' : '';
+      const wasInExpandedSquad = prev.placedSquads.some(
+        (s) => s.teamKey === oldTeamKey && s.isExpanded
+      );
+
+      return {
+        ...prev,
+        players: prev.players.map((p) =>
+          p.id === playerId ? { ...p, team: '' } : p
+        ),
+        placedPlayers: wasInExpandedSquad
+          ? prev.placedPlayers.filter((p) => p.playerId !== playerId)
+          : prev.placedPlayers.map((p) =>
+              p.playerId === playerId ? { ...p, team: '' } : p
+            ),
+      };
+    });
+  }, []);
+
   // Drawing & Tactical Notes
   const handleAddArrow = useCallback((arrow: Omit<DrawingArrow, 'id'>) => {
     const id = `arrow-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -963,6 +1107,10 @@ export default function App() {
           onDeploySquad={handleDeploySquad}
           onRecallSquad={handleRecallSquad}
           onRenameTeam={handleRenameTeam}
+          onCreateTeam={handleCreateTeam}
+          onDeleteTeam={handleDeleteTeam}
+          onAssignPlayerToTeam={handleAssignPlayerToTeam}
+          onRemovePlayerFromTeam={handleRemovePlayerFromTeam}
           onToolModeChange={setToolMode}
           onColorChange={setActiveColor}
           onUndoAnnotation={handleUndoAnnotation}
