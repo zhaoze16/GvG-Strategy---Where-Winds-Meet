@@ -911,8 +911,6 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
               {placedIcons.map((icon) => {
                 const meta = MAP_ICONS_META[icon.type];
                 const customObjUrl = mapObjectIcons[icon.type];
-                const objBorderHex =
-                  (customObjUrl && mapObjectIconColors[icon.type]) || meta.borderHex;
                 return (
                   <div
                     key={icon.id}
@@ -927,6 +925,7 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                         offsetY: pt.y - icon.y,
                       };
                     }}
+                    title={icon.label || meta.label}
                     className="group absolute flex flex-col items-center"
                     style={{
                       left: `${icon.x}px`,
@@ -941,10 +940,9 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                       style={{
                         width: icon.type === 'boss' ? '40px' : '34px',
                         height: icon.type === 'boss' ? '40px' : '34px',
-                        backgroundColor: customObjUrl ? '#0f172a' : meta.bgHex,
-                        border: `2px solid ${objBorderHex}`,
+                        backgroundColor: customObjUrl ? 'transparent' : meta.bgHex,
                         color: meta.accentHex,
-                        boxShadow: '0 4px 10px rgba(2, 6, 23, 0.75)',
+                        boxShadow: customObjUrl ? 'none' : '0 4px 10px rgba(2, 6, 23, 0.75)',
                       }}
                     >
                       {customObjUrl ? (
@@ -953,8 +951,8 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                           alt={meta.label}
                           referrerPolicy="no-referrer"
                           style={{
-                            width: icon.type === 'boss' ? '30px' : '24px',
-                            height: icon.type === 'boss' ? '30px' : '24px',
+                            width: icon.type === 'boss' ? '34px' : '28px',
+                            height: icon.type === 'boss' ? '34px' : '28px',
                             objectFit: 'contain',
                             display: 'block',
                           }}
@@ -986,17 +984,6 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                         ×
                       </button>
                     </div>
-
-                    <span
-                      className="mt-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                      style={{
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                        color: meta.accentHex,
-                        border: `1px solid ${objBorderHex}`,
-                      }}
-                    >
-                      {icon.label || meta.shortLabel}
-                    </span>
                   </div>
                 );
               })}
@@ -1073,10 +1060,9 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                     <div
                       className="relative flex h-9 w-9 items-center justify-center rounded-full"
                       style={{
-                        backgroundColor: customRoleUrl ? '#0f172a' : roleMeta.bgHex,
-                        border: `2.5px solid ${roleBorderHex}`,
+                        backgroundColor: customRoleUrl ? 'transparent' : roleMeta.bgHex,
                         color: roleMeta.textHex,
-                        boxShadow: '0 4px 12px rgba(2, 6, 23, 0.85)',
+                        boxShadow: customRoleUrl ? 'none' : '0 4px 12px rgba(2, 6, 23, 0.85)',
                       }}
                     >
                       {customRoleUrl ? (
@@ -1085,10 +1071,9 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                           alt={token.role}
                           referrerPolicy="no-referrer"
                           style={{
-                            width: '24px',
-                            height: '24px',
+                            width: '30px',
+                            height: '30px',
                             objectFit: 'contain',
-                            borderRadius: '9999px',
                             display: 'block',
                           }}
                         />
@@ -1168,10 +1153,9 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                       <div
                         className="mt-1 flex items-center rounded"
                         style={{
-                          gap: '3px',
-                          padding: '2px 3px',
-                          backgroundColor: 'rgba(2, 6, 23, 0.9)',
-                          border: '1px solid #334155',
+                          gap: '4px',
+                          padding: '2px 4px',
+                          backgroundColor: 'rgba(2, 6, 23, 0.82)',
                         }}
                       >
                         {loadoutBadges.map((badge, bIdx) => {
@@ -1198,13 +1182,7 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                                 width: '24px',
                                 height: '24px',
                                 objectFit: 'contain',
-                                borderRadius: '4px',
-                                border:
-                                  badge.kind === 'Path'
-                                    ? `1.5px solid ${pathAccent}`
-                                    : '1px solid #475569',
-                                backgroundColor: '#0f172a',
-                                padding: '2px',
+                                display: 'block',
                               }}
                             />
                           );

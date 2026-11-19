@@ -137,7 +137,7 @@ export const IconPickerInput: React.FC<IconPickerInputProps> = ({
                       src={icon.imageDataUrl}
                       alt={icon.name}
                       referrerPolicy="no-referrer"
-                      className="h-5 w-5 shrink-0 rounded border border-slate-700 bg-slate-950 object-contain p-0.5"
+                      className="h-5 w-5 shrink-0 object-contain"
                     />
                     <span className="truncate font-medium">{icon.name}</span>
                   </button>

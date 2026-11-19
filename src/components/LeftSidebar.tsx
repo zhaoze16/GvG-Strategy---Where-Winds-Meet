@@ -214,8 +214,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 {SPAWN_ORDER.map((type) => {
                   const meta = MAP_ICONS_META[type];
                   const customIconUrl = mapObjectIcons[type];
-                  const objBorderHex =
-                    (customIconUrl && mapObjectIconColors[type]) || meta.borderHex;
                   return (
                     <div
                       key={type}
@@ -247,10 +245,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                       className="group relative flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2.5 py-2 text-left hover:border-slate-600 hover:bg-slate-800/80 transition-colors cursor-grab active:cursor-grabbing"
                     >
                       <span
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border overflow-hidden"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md overflow-hidden"
                         style={{
-                          backgroundColor: customIconUrl ? '#0f172a' : meta.bgHex,
-                          borderColor: objBorderHex,
+                          backgroundColor: customIconUrl ? 'transparent' : meta.bgHex,
                           color: meta.accentHex,
                         }}
                       >
@@ -259,7 +256,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                             src={customIconUrl}
                             alt={meta.label}
                             referrerPolicy="no-referrer"
-                            className="h-5 w-5 object-contain"
+                            className="h-6 w-6 object-contain"
                           />
                         ) : (
                           <i className={`${meta.faIcon} text-xs`} aria-hidden="true" />
@@ -344,12 +341,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
                           <span
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border overflow-hidden"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md overflow-hidden"
                             style={{
-                              backgroundColor: roleIcons[player.role] ? '#0f172a' : roleMeta.bgHex,
-                              borderColor:
-                                (roleIcons[player.role] && roleIconColors[player.role]) ||
-                                roleMeta.borderHex,
+                              backgroundColor: roleIcons[player.role] ? 'transparent' : roleMeta.bgHex,
                               color: roleMeta.textHex,
                             }}
                           >
@@ -358,7 +352,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                 src={roleIcons[player.role]}
                                 alt={player.role}
                                 referrerPolicy="no-referrer"
-                                className="h-5 w-5 object-contain"
+                                className="h-6 w-6 object-contain"
                               />
                             ) : (
                               <i className={`${roleMeta.faIcon} text-xs`} aria-hidden="true" />
@@ -393,10 +387,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                       .map((slot, idx) => {
                                         const icon = findAssetIcon(slot.name, slot.icons);
                                         if (icon) {
-                                          const borderCol =
-                                            slot.label === 'Path'
-                                              ? icon.accentColor || '#94a3b8'
-                                              : '#334155';
                                           return (
                                             <img
                                               key={`${slot.label}-${slot.name}-${idx}`}
@@ -404,8 +394,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                               alt={icon.name}
                                               title={`${slot.label}: ${icon.name}`}
                                               referrerPolicy="no-referrer"
-                                              className="h-5 w-5 shrink-0 rounded object-contain bg-slate-900 p-0.5"
-                                              style={{ border: `1.5px solid ${borderCol}` }}
+                                              className="h-5 w-5 shrink-0 object-contain"
                                             />
                                           );
                                         }

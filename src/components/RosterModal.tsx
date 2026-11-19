@@ -358,7 +358,7 @@ const AssetLibraryTab: React.FC<AssetLibraryTabProps> = ({
                     src={bundle.pathIcon.imageDataUrl}
                     alt={bundle.pathIcon.name}
                     referrerPolicy="no-referrer"
-                    className="h-9 w-9 shrink-0 rounded border border-amber-500/60 bg-slate-950 object-contain p-1"
+                    className="h-9 w-9 shrink-0 object-contain"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="text-[10px] font-semibold text-amber-400">
@@ -380,7 +380,7 @@ const AssetLibraryTab: React.FC<AssetLibraryTabProps> = ({
                         src={w.imageDataUrl}
                         alt={w.name}
                         referrerPolicy="no-referrer"
-                        className="h-7 w-7 shrink-0 rounded border border-slate-700 bg-slate-950 object-contain p-0.5"
+                        className="h-7 w-7 shrink-0 object-contain"
                       />
                       <input
                         type="text"
@@ -440,13 +440,7 @@ const AssetLibraryTab: React.FC<AssetLibraryTabProps> = ({
                   src={icon.imageDataUrl}
                   alt={icon.name}
                   referrerPolicy="no-referrer"
-                  className="h-10 w-10 shrink-0 rounded-md bg-slate-900 object-contain p-1"
-                  style={{
-                    border:
-                      prefix === 'path'
-                        ? `1.5px solid ${icon.accentColor || '#94a3b8'}`
-                        : '1px solid #334155',
-                  }}
+                  className="h-10 w-10 shrink-0 object-contain"
                 />
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-1.5">
@@ -696,8 +690,7 @@ const SystemIconsTab: React.FC<SystemIconsTabProps> = ({
                 <div
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full overflow-hidden"
                   style={{
-                    backgroundColor: customUrl ? '#0f172a' : meta.bgHex,
-                    border: `2px solid ${borderHex}`,
+                    backgroundColor: customUrl ? 'transparent' : meta.bgHex,
                     color: meta.textHex,
                   }}
                 >
@@ -706,7 +699,7 @@ const SystemIconsTab: React.FC<SystemIconsTabProps> = ({
                       src={customUrl}
                       alt={role}
                       referrerPolicy="no-referrer"
-                      className="h-7 w-7 object-contain"
+                      className="h-9 w-9 object-contain"
                     />
                   ) : (
                     <i className={`${meta.faIcon} text-sm`} aria-hidden="true" />
@@ -787,8 +780,7 @@ const SystemIconsTab: React.FC<SystemIconsTabProps> = ({
                 <div
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg overflow-hidden"
                   style={{
-                    backgroundColor: customUrl ? '#0f172a' : meta.bgHex,
-                    border: `2px solid ${borderHex}`,
+                    backgroundColor: customUrl ? 'transparent' : meta.bgHex,
                     color: meta.accentHex,
                   }}
                 >
@@ -797,7 +789,7 @@ const SystemIconsTab: React.FC<SystemIconsTabProps> = ({
                       src={customUrl}
                       alt={meta.label}
                       referrerPolicy="no-referrer"
-                      className="h-7 w-7 object-contain"
+                      className="h-9 w-9 object-contain"
                     />
                   ) : (
                     <i className={`${meta.faIcon} text-sm`} aria-hidden="true" />
@@ -1062,8 +1054,7 @@ export const RosterModal: React.FC<RosterModalProps> = ({
             alt={pIcon.name}
             title={`Path: ${pIcon.name}`}
             referrerPolicy="no-referrer"
-            className="h-6 w-6 shrink-0 rounded bg-slate-950 object-contain p-0.5"
-            style={{ border: `1.5px solid ${pIcon.accentColor || '#94a3b8'}` }}
+            className="h-6 w-6 shrink-0 object-contain"
           />
         ) : pathName ? (
           <span
@@ -1080,7 +1071,7 @@ export const RosterModal: React.FC<RosterModalProps> = ({
             alt={wIcon.name}
             title={`Weapon: ${wIcon.name}`}
             referrerPolicy="no-referrer"
-            className="h-6 w-6 shrink-0 rounded border border-slate-700 bg-slate-950 object-contain p-0.5"
+            className="h-6 w-6 shrink-0 object-contain"
           />
         ) : weaponName ? (
           <span className="text-slate-300">{weaponName}</span>
