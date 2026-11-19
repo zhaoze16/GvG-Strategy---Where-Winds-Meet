@@ -75,7 +75,7 @@ export const IconPickerInput: React.FC<IconPickerInputProps> = ({
             setIsOpen(true);
           }}
           placeholder={placeholder}
-          className="w-full bg-transparent px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none"
         />
         {value && (
           <button
@@ -85,7 +85,7 @@ export const IconPickerInput: React.FC<IconPickerInputProps> = ({
               setIsOpen(true);
             }}
             title="Clear selection"
-            className="px-1 text-slate-500 hover:text-slate-300 cursor-pointer"
+            className="shrink-0 px-1.5 text-slate-500 hover:text-slate-300 cursor-pointer"
           >
             <i className="fa-solid fa-xmark text-[10px]" aria-hidden="true" />
           </button>
@@ -94,7 +94,7 @@ export const IconPickerInput: React.FC<IconPickerInputProps> = ({
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           aria-label="Toggle icon picker"
-          className="border-l border-slate-800 px-2 py-1.5 text-slate-400 hover:text-slate-200 cursor-pointer"
+          className="shrink-0 border-l border-slate-800 px-2 py-1.5 text-slate-400 hover:text-slate-200 cursor-pointer"
         >
           <i
             className={`fa-solid fa-chevron-down text-[10px] transition-transform ${
@@ -106,7 +106,7 @@ export const IconPickerInput: React.FC<IconPickerInputProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-2xl">
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-56 min-w-full w-max max-w-xs overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-2xl">
           {icons.length === 0 ? (
             <div className="px-2.5 py-2 text-[11px] text-slate-400">{emptyHint}</div>
           ) : filteredIcons.length === 0 ? (

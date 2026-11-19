@@ -13,6 +13,33 @@ import {
 import { IconPickerInput } from './IconPickerInput';
 import { TeamOption, TeamPickerInput } from './TeamPickerInput';
 
+function filterWeaponsByPath(
+  pathName: string | undefined,
+  pathIcons: PathIcon[],
+  weaponIcons: WeaponIcon[]
+): WeaponIcon[] {
+  const normPath = (pathName || '').trim().toLowerCase();
+  if (!normPath) return weaponIcons;
+
+  const pIcon = findAssetIcon(pathName, pathIcons);
+  if (!pIcon) {
+    const byWeaponLink = weaponIcons.filter(
+      (w) => (w.linkedPath || '').trim().toLowerCase() === normPath
+    );
+    return byWeaponLink.length > 0 ? byWeaponLink : weaponIcons;
+  }
+
+  const linkedSet = new Set(
+    (pIcon.linkedWeapons || []).map((w) => w.trim().toLowerCase()).filter(Boolean)
+  );
+
+  return weaponIcons.filter((w) => {
+    const wNameNorm = w.name.trim().toLowerCase();
+    const wLinkedPathNorm = (w.linkedPath || '').trim().toLowerCase();
+    return linkedSet.has(wNameNorm) || wLinkedPathNorm === normPath;
+  });
+}
+
 export type RosterModalTab = 'roster' | 'weapons' | 'paths' | 'icons';
 
 interface RosterModalProps {
@@ -931,6 +958,16 @@ export const RosterModal: React.FC<RosterModalProps> = ({
     return pIcon?.linkedWeapons || [];
   }, [formState.path2, pathIcons]);
 
+  const weapon1Options = useMemo(
+    () => filterWeaponsByPath(formState.path1, pathIcons, weaponIcons),
+    [formState.path1, pathIcons, weaponIcons]
+  );
+
+  const weapon2Options = useMemo(
+    () => filterWeaponsByPath(formState.path2, pathIcons, weaponIcons),
+    [formState.path2, pathIcons, weaponIcons]
+  );
+
   const teamOptions = useMemo<TeamOption[]>(() => {
     const counts = new Map<string, number>();
     players.forEach((p) => {
@@ -991,6 +1028,36 @@ export const RosterModal: React.FC<RosterModalProps> = ({
       weapon2: val,
       path2: autoPath !== null ? autoPath : s.path2,
     }));
+  };
+
+  const handlePath1Change = (val: string) => {
+    const matchedPath = findAssetIcon(val, pathIcons);
+    setFormState((s) => {
+      if (!matchedPath) return { ...s, path1: val };
+      const allowed = filterWeaponsByPath(val, pathIcons, weaponIcons);
+      const curW = s.weapon1.trim().toLowerCase();
+      const isAllowed = !curW || allowed.some((w) => w.name.trim().toLowerCase() === curW);
+      return {
+        ...s,
+        path1: val,
+        weapon1: isAllowed ? s.weapon1 : '',
+      };
+    });
+  };
+
+  const handlePath2Change = (val: string) => {
+    const matchedPath = findAssetIcon(val, pathIcons);
+    setFormState((s) => {
+      if (!matchedPath) return { ...s, path2: val };
+      const allowed = filterWeaponsByPath(val, pathIcons, weaponIcons);
+      const curW = s.weapon2.trim().toLowerCase();
+      const isAllowed = !curW || allowed.some((w) => w.name.trim().toLowerCase() === curW);
+      return {
+        ...s,
+        path2: val,
+        weapon2: isAllowed ? s.weapon2 : '',
+      };
+    });
   };
 
   const startEdit = (player: Player) => {
@@ -1093,7 +1160,7 @@ export const RosterModal: React.FC<RosterModalProps> = ({
       aria-modal="true"
       aria-labelledby="roster-modal-title"
     >
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-[1440px] flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
         {/* Modal Header */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 px-6 py-4">
           <div>
@@ -1189,126 +1256,135 @@ export const RosterModal: React.FC<RosterModalProps> = ({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-4 lg:grid-cols-8">
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                    ID (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formState.id}
-                    onChange={(e) => setFormState((s) => ({ ...s, id: e.target.value }))}
-                    placeholder="Auto ID"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono-tabular text-xs text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                    Player Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formState.name}
-                    onChange={(e) => setFormState((s) => ({ ...s, name: e.target.value }))}
-                    placeholder="e.g. Kaelen"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                    Role
-                  </label>
-                  <select
-                    value={formState.role}
-                    onChange={(e) =>
-                      setFormState((s) => ({ ...s, role: e.target.value as PlayerRole }))
-                    }
-                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-100 focus:border-blue-500 focus:outline-none"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                    Team / Squad
-                  </label>
-                  <TeamPickerInput
-                    value={formState.team}
-                    onChange={(val) => setFormState((s) => ({ ...s, team: val }))}
-                    teams={teamOptions}
-                    placeholder="Pick or type..."
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                    Weapon 1
-                  </label>
-                  <IconPickerInput
-                    value={formState.weapon1}
-                    onChange={handleWeapon1Change}
-                    icons={weaponIcons}
-                    prioritizedNames={path1LinkedWeapons}
-                    placeholder="Pick Weapon 1"
-                    emptyHint="Upload in Weapon Icons or Path Icons tab"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                    Path 1
-                  </label>
-                  <IconPickerInput
-                    value={formState.path1 || ''}
-                    onChange={(val) => setFormState((s) => ({ ...s, path1: val }))}
-                    icons={pathIcons}
-                    placeholder="Auto / Pick Path 1"
-                    emptyHint="Upload in Path Icons tab"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                    Weapon 2
-                  </label>
-                  <IconPickerInput
-                    value={formState.weapon2}
-                    onChange={handleWeapon2Change}
-                    icons={weaponIcons}
-                    prioritizedNames={path2LinkedWeapons}
-                    placeholder="Pick Weapon 2"
-                    emptyHint="Upload in Weapon Icons or Path Icons tab"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
-                    Path 2
-                  </label>
-                  <div className="flex gap-1.5">
-                    <div className="min-w-0 flex-1">
-                      <IconPickerInput
-                        value={formState.path2 || ''}
-                        onChange={(val) => setFormState((s) => ({ ...s, path2: val }))}
-                        icons={pathIcons}
-                        placeholder="Auto / Pick Path 2"
-                        emptyHint="Upload in Path Icons tab"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400 transition-colors cursor-pointer"
-                    >
-                      {editingId ? 'Save' : 'Add'}
-                    </button>
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                      ID (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={formState.id}
+                      onChange={(e) => setFormState((s) => ({ ...s, id: e.target.value }))}
+                      placeholder="Auto ID"
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 font-mono-tabular text-xs text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
                   </div>
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                      Player Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={formState.name}
+                      onChange={(e) => setFormState((s) => ({ ...s, name: e.target.value }))}
+                      placeholder="e.g. Kaelen"
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                      Role
+                    </label>
+                    <select
+                      value={formState.role}
+                      onChange={(e) =>
+                        setFormState((s) => ({ ...s, role: e.target.value as PlayerRole }))
+                      }
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-100 focus:border-blue-500 focus:outline-none"
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                      Team / Squad
+                    </label>
+                    <TeamPickerInput
+                      value={formState.team}
+                      onChange={(val) => setFormState((s) => ({ ...s, team: val }))}
+                      teams={teamOptions}
+                      placeholder="Pick or type..."
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-end">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                      Weapon 1
+                    </label>
+                    <IconPickerInput
+                      value={formState.weapon1}
+                      onChange={handleWeapon1Change}
+                      icons={weapon1Options}
+                      prioritizedNames={path1LinkedWeapons}
+                      placeholder="Pick Weapon 1"
+                      emptyHint={
+                        formState.path1
+                          ? `No weapons linked to "${formState.path1}"`
+                          : 'Upload in Weapon Icons or Path Icons tab'
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                      Path 1
+                    </label>
+                    <IconPickerInput
+                      value={formState.path1 || ''}
+                      onChange={handlePath1Change}
+                      icons={pathIcons}
+                      placeholder="Auto / Pick Path 1"
+                      emptyHint="Upload in Path Icons tab"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                      Weapon 2
+                    </label>
+                    <IconPickerInput
+                      value={formState.weapon2}
+                      onChange={handleWeapon2Change}
+                      icons={weapon2Options}
+                      prioritizedNames={path2LinkedWeapons}
+                      placeholder="Pick Weapon 2"
+                      emptyHint={
+                        formState.path2
+                          ? `No weapons linked to "${formState.path2}"`
+                          : 'Upload in Weapon Icons or Path Icons tab'
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                      Path 2
+                    </label>
+                    <IconPickerInput
+                      value={formState.path2 || ''}
+                      onChange={handlePath2Change}
+                      icons={pathIcons}
+                      placeholder="Auto / Pick Path 2"
+                      emptyHint="Upload in Path Icons tab"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="h-[30px] shrink-0 rounded-lg bg-amber-500 px-5 text-xs font-semibold text-slate-950 hover:bg-amber-400 transition-colors cursor-pointer"
+                  >
+                    {editingId ? 'Save' : 'Add'}
+                  </button>
                 </div>
               </div>
 
