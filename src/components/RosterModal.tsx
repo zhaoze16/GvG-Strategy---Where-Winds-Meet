@@ -11,6 +11,7 @@ import {
   processSingleIconWithColor,
 } from '../utils/storageAndSchema';
 import { IconPickerInput } from './IconPickerInput';
+import { TeamOption, TeamPickerInput } from './TeamPickerInput';
 
 export type RosterModalTab = 'roster' | 'weapons' | 'paths' | 'icons';
 
@@ -938,6 +939,18 @@ export const RosterModal: React.FC<RosterModalProps> = ({
     return pIcon?.linkedWeapons || [];
   }, [formState.path2, pathIcons]);
 
+  const teamOptions = useMemo<TeamOption[]>(() => {
+    const counts = new Map<string, number>();
+    players.forEach((p) => {
+      const t = p.team.trim();
+      if (!t) return;
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [players]);
+
   if (!isOpen) return null;
 
   const resetForm = () => {
@@ -1235,12 +1248,11 @@ export const RosterModal: React.FC<RosterModalProps> = ({
                   <label className="mb-1 block text-[11px] font-medium text-slate-400">
                     Team / Squad
                   </label>
-                  <input
-                    type="text"
+                  <TeamPickerInput
                     value={formState.team}
-                    onChange={(e) => setFormState((s) => ({ ...s, team: e.target.value }))}
-                    placeholder="e.g. Vanguard"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                    onChange={(val) => setFormState((s) => ({ ...s, team: val }))}
+                    teams={teamOptions}
+                    placeholder="Pick or type..."
                   />
                 </div>
 
