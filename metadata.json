@@ -1,0 +1,6 @@
+{
+  "name": "GvG Strategy Matrix",
+  "description": "Interactive Guild War (GvG) strategy planner, 1200x900 walled fortress battlefield canvas, tactical drawing suite, and squad roster manager.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
