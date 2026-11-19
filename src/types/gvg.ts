@@ -43,6 +43,14 @@ export interface PlacedPlayer {
   y: number;
 }
 
+export interface PlacedSquad {
+  id: string;
+  teamKey: string;
+  x: number;
+  y: number;
+  isExpanded: boolean;
+}
+
 export interface DrawingArrow {
   id: string;
   x1: number;
@@ -86,6 +94,7 @@ export type PathIcon = AssetIcon;
 export interface AppState {
   players: Player[];
   placedPlayers: PlacedPlayer[];
+  placedSquads: PlacedSquad[];
   placedIcons: PlacedIcon[];
   arrows: DrawingArrow[];
   drawings: DrawingPath[];
@@ -106,6 +115,7 @@ export interface GuildWarExportSchema {
   exportDate: string;
   players: Player[];
   individuals: PlacedPlayer[];
+  placedSquads?: PlacedSquad[];
   groups: Array<{
     teamKey: string;
     teamName: string;

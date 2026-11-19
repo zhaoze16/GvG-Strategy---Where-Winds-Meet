@@ -14,6 +14,7 @@ import {
   PathIcon,
   PlacedIcon,
   PlacedPlayer,
+  PlacedSquad,
   Player,
   PlayerRole,
   SidebarTab,
@@ -177,6 +178,7 @@ export default function App() {
     setState((prev) => ({
       ...prev,
       placedPlayers: [],
+      placedSquads: [],
       placedIcons: [],
       arrows: [],
       drawings: [],
@@ -380,21 +382,105 @@ export default function App() {
     }));
   }, []);
 
-  // Circular Squad Deployment
+  // Team-Marker First, Click-to-Expand Circular Squad Deployment
   const handleDeploySquad = useCallback(
     (teamKey: string, members: Player[]) => {
       if (members.length === 0) return;
-      const cx = CANVAS_WIDTH / 2;
-      const cy = CANVAS_HEIGHT / 2;
-      const radius =
-        members.length === 1 ? 0 : Math.min(185, Math.max(85, members.length * 19));
+      const displayName = state.teamNames[teamKey] || teamKey;
+      const existing = state.placedSquads.find((s) => s.teamKey === teamKey);
 
-      setState((prev) => {
+      if (!existing) {
+        const offsetIdx = state.placedSquads.length % 5;
+        const offsetY =
+          offsetIdx === 0
+            ? 0
+            : (offsetIdx % 2 === 1 ? -1 : 1) * Math.ceil(offsetIdx / 2) * 48;
+        const newSquad: PlacedSquad = {
+          id: `squad-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          teamKey,
+          x: CANVAS_WIDTH / 2,
+          y: Math.max(60, Math.min(CANVAS_HEIGHT - 60, CANVAS_HEIGHT / 2 + offsetY)),
+          isExpanded: false,
+        };
+        setState((prev) => ({
+          ...prev,
+          placedSquads: [...prev.placedSquads, newSquad],
+        }));
+        showToast(
+          `Team "${displayName}" placed on map. Click its name on the map to expand all members.`
+        );
+        return;
+      }
+
+      if (existing.isExpanded) {
+        const count = members.length;
+        const radius = count <= 1 ? 44 : Math.min(100, Math.max(50, 40 + count * 5));
+        setState((prev) => {
+          const nextPlaced = [...prev.placedPlayers];
+          members.forEach((member, idx) => {
+            const angle = (2 * Math.PI * idx) / Math.max(1, count) - Math.PI / 2;
+            const tx = Math.max(
+              36,
+              Math.min(CANVAS_WIDTH - 36, Math.round(existing.x + radius * Math.cos(angle)))
+            );
+            const ty = Math.max(
+              36,
+              Math.min(CANVAS_HEIGHT - 36, Math.round(existing.y + radius * Math.sin(angle)))
+            );
+            const existingIdx = nextPlaced.findIndex((p) => p.playerId === member.id);
+            if (existingIdx >= 0) {
+              nextPlaced[existingIdx] = { ...nextPlaced[existingIdx], x: tx, y: ty };
+            } else {
+              nextPlaced.push({
+                id: `token-${member.id}-${Date.now()}-${idx}`,
+                playerId: member.id,
+                name: member.name,
+                role: member.role,
+                team: member.team,
+                weapon1: member.weapon1,
+                weapon2: member.weapon2,
+                path1: member.path1,
+                path2: member.path2,
+                x: tx,
+                y: ty,
+              });
+            }
+          });
+          return { ...prev, placedPlayers: nextPlaced };
+        });
+        showToast(`Re-centered "${displayName}" formation around team name.`);
+      } else {
+        showToast(`"${displayName}" is on the map — click its name on the map to deploy members.`);
+      }
+    },
+    [showToast, state.placedSquads, state.teamNames]
+  );
+
+  const handleToggleSquadExpand = useCallback((squadId: string) => {
+    setState((prev) => {
+      const squad = prev.placedSquads.find((s) => s.id === squadId);
+      if (!squad) return prev;
+
+      const squadMembers = prev.players.filter(
+        (p) => (p.team.trim() || 'Unassigned') === squad.teamKey
+      );
+      const squadMemberIds = new Set(squadMembers.map((m) => m.id));
+
+      if (!squad.isExpanded) {
+        const count = squadMembers.length;
+        const radius = count <= 1 ? 44 : Math.min(100, Math.max(50, 40 + count * 5));
         const nextPlaced = [...prev.placedPlayers];
-        members.forEach((member, idx) => {
-          const angle = (2 * Math.PI * idx) / members.length - Math.PI / 2;
-          const tx = Math.round(cx + radius * Math.cos(angle));
-          const ty = Math.round(cy + radius * Math.sin(angle));
+
+        squadMembers.forEach((member, idx) => {
+          const angle = (2 * Math.PI * idx) / Math.max(1, count) - Math.PI / 2;
+          const tx = Math.max(
+            36,
+            Math.min(CANVAS_WIDTH - 36, Math.round(squad.x + radius * Math.cos(angle)))
+          );
+          const ty = Math.max(
+            36,
+            Math.min(CANVAS_HEIGHT - 36, Math.round(squad.y + radius * Math.sin(angle)))
+          );
 
           const existingIdx = nextPlaced.findIndex((p) => p.playerId === member.id);
           if (existingIdx >= 0) {
@@ -415,17 +501,73 @@ export default function App() {
             });
           }
         });
-        return { ...prev, placedPlayers: nextPlaced };
-      });
-      showToast(`Deployed ${state.teamNames[teamKey] || teamKey} in circular formation.`);
-    },
-    [showToast, state.teamNames]
-  );
 
-  const handleRecallSquad = useCallback((_teamKey: string, members: Player[]) => {
+        return {
+          ...prev,
+          placedPlayers: nextPlaced,
+          placedSquads: prev.placedSquads.map((s) =>
+            s.id === squadId ? { ...s, isExpanded: true } : s
+          ),
+        };
+      }
+
+      return {
+        ...prev,
+        placedPlayers: prev.placedPlayers.filter((p) => !squadMemberIds.has(p.playerId)),
+        placedSquads: prev.placedSquads.map((s) =>
+          s.id === squadId ? { ...s, isExpanded: false } : s
+        ),
+      };
+    });
+  }, []);
+
+  const handleMovePlacedSquad = useCallback((squadId: string, x: number, y: number) => {
+    setState((prev) => {
+      const target = prev.placedSquads.find((s) => s.id === squadId);
+      if (!target) return prev;
+
+      const dx = x - target.x;
+      const dy = y - target.y;
+
+      return {
+        ...prev,
+        placedSquads: prev.placedSquads.map((s) => (s.id === squadId ? { ...s, x, y } : s)),
+        placedPlayers: target.isExpanded
+          ? prev.placedPlayers.map((p) => {
+              if ((p.team.trim() || 'Unassigned') !== target.teamKey) return p;
+              return {
+                ...p,
+                x: Math.max(24, Math.min(CANVAS_WIDTH - 24, Math.round(p.x + dx))),
+                y: Math.max(24, Math.min(CANVAS_HEIGHT - 24, Math.round(p.y + dy))),
+              };
+            })
+          : prev.placedPlayers,
+      };
+    });
+  }, []);
+
+  const handleRemovePlacedSquad = useCallback((squadId: string) => {
+    setState((prev) => {
+      const target = prev.placedSquads.find((s) => s.id === squadId);
+      if (!target) return prev;
+      const memberIds = new Set(
+        prev.players
+          .filter((p) => (p.team.trim() || 'Unassigned') === target.teamKey)
+          .map((p) => p.id)
+      );
+      return {
+        ...prev,
+        placedSquads: prev.placedSquads.filter((s) => s.id !== squadId),
+        placedPlayers: prev.placedPlayers.filter((p) => !memberIds.has(p.playerId)),
+      };
+    });
+  }, []);
+
+  const handleRecallSquad = useCallback((teamKey: string, members: Player[]) => {
     const memberIds = new Set(members.map((m) => m.id));
     setState((prev) => ({
       ...prev,
+      placedSquads: prev.placedSquads.filter((s) => s.teamKey !== teamKey),
       placedPlayers: prev.placedPlayers.filter((p) => !memberIds.has(p.playerId)),
     }));
   }, []);
@@ -589,6 +731,7 @@ export default function App() {
       ...prev,
       players: [],
       placedPlayers: [],
+      placedSquads: [],
     }));
   }, []);
 
@@ -804,6 +947,7 @@ export default function App() {
           onTabChange={setActiveTab}
           players={state.players}
           placedPlayers={state.placedPlayers}
+          placedSquads={state.placedSquads}
           weaponIcons={state.weaponIcons}
           pathIcons={state.pathIcons}
           roleIcons={state.roleIcons}
@@ -836,7 +980,10 @@ export default function App() {
           customMapImage={state.customMapImage}
           toolMode={toolMode}
           activeColor={activeColor}
+          players={state.players}
           placedPlayers={state.placedPlayers}
+          placedSquads={state.placedSquads}
+          teamNames={state.teamNames}
           placedIcons={state.placedIcons}
           weaponIcons={state.weaponIcons}
           pathIcons={state.pathIcons}
@@ -854,6 +1001,9 @@ export default function App() {
           onDropPlayer={spawnOrMovePlayerAt}
           onMovePlayer={handleMovePlacedPlayer}
           onRemovePlayer={handleRemovePlacedPlayer}
+          onToggleSquadExpand={handleToggleSquadExpand}
+          onMoveSquad={handleMovePlacedSquad}
+          onRemoveSquad={handleRemovePlacedSquad}
           onMoveIcon={handleMoveIcon}
           onRemoveIcon={handleRemoveIcon}
           onAddArrow={handleAddArrow}

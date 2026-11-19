@@ -7,6 +7,7 @@ import {
   MapIconType,
   PlacedIcon,
   PlacedPlayer,
+  PlacedSquad,
   Player,
   PlayerRole,
   TacticalNote,
@@ -25,6 +26,7 @@ export function createInitialState(): AppState {
   return {
     players: DEFAULT_PLAYERS,
     placedPlayers: [],
+    placedSquads: [],
     placedIcons: defaultPlacedIcons,
     arrows: [],
     drawings: [],
@@ -80,6 +82,7 @@ export function loadAppState(): AppState {
     return {
       players: Array.isArray(parsed.players) ? parsed.players : DEFAULT_PLAYERS,
       placedPlayers: Array.isArray(parsed.placedPlayers) ? parsed.placedPlayers : [],
+      placedSquads: Array.isArray(parsed.placedSquads) ? parsed.placedSquads : [],
       placedIcons: Array.isArray(parsed.placedIcons) ? parsed.placedIcons : [],
       arrows: Array.isArray(parsed.arrows) ? parsed.arrows : [],
       drawings: Array.isArray(parsed.drawings) ? parsed.drawings : [],
@@ -108,6 +111,7 @@ export function saveAppState(state: AppState): void {
   const coreState = {
     players: state.players,
     placedPlayers: state.placedPlayers,
+    placedSquads: state.placedSquads,
     placedIcons: state.placedIcons,
     arrows: state.arrows,
     drawings: state.drawings,
@@ -158,6 +162,7 @@ export function buildExportJson(state: AppState): GuildWarExportSchema {
     exportDate: new Date().toISOString(),
     players: state.players,
     individuals: state.placedPlayers,
+    placedSquads: state.placedSquads,
     groups,
     objectives: bosses,
     notes: state.notes,
@@ -290,6 +295,18 @@ export function parseImportedJson(rawText: string): AppState {
       };
     });
 
+  const placedSquads: PlacedSquad[] = Array.isArray(data.placedSquads)
+    ? data.placedSquads
+        .filter((sq): sq is Record<string, unknown> => Boolean(sq && typeof sq === 'object'))
+        .map((sq, idx) => ({
+          id: typeof sq.id === 'string' ? sq.id : `imp-sq-${Date.now()}-${idx}`,
+          teamKey: typeof sq.teamKey === 'string' ? sq.teamKey : 'Unassigned',
+          x: typeof sq.x === 'number' ? sq.x : 600,
+          y: typeof sq.y === 'number' ? sq.y : 450,
+          isExpanded: Boolean(sq.isExpanded),
+        }))
+    : [];
+
   const bossesList = normalizeIconList(data.bosses, 'boss');
   const objectivesList = normalizeIconList(data.objectives, 'boss');
   const mergedBossesMap = new Map<string, PlacedIcon>();
@@ -382,6 +399,7 @@ export function parseImportedJson(rawText: string): AppState {
   return {
     players,
     placedPlayers,
+    placedSquads,
     placedIcons,
     arrows,
     drawings,

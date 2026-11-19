@@ -4,6 +4,7 @@ import {
   MapIconType,
   PathIcon,
   PlacedPlayer,
+  PlacedSquad,
   Player,
   PlayerRole,
   SidebarTab,
@@ -17,6 +18,7 @@ interface LeftSidebarProps {
   onTabChange: (tab: SidebarTab) => void;
   players: Player[];
   placedPlayers: PlacedPlayer[];
+  placedSquads: PlacedSquad[];
   weaponIcons: WeaponIcon[];
   pathIcons: PathIcon[];
   roleIcons: Partial<Record<PlayerRole, string>>;
@@ -56,6 +58,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onTabChange,
   players,
   placedPlayers,
+  placedSquads,
   weaponIcons,
   pathIcons,
   roleIcons,
@@ -435,7 +438,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 Teams &amp; Squad Assignment
               </h2>
               <p className="mt-0.5 text-xs text-slate-400">
-                Deploy squads in a circular tactical formation around the citadel center.
+                Deploy places the team name on the map. Click the team name on the map to spread all members around it.
               </p>
             </div>
 
@@ -448,6 +451,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 const displayName = teamNames[teamKey] || teamKey;
                 const isEditing = editingTeamKey === teamKey;
                 const onMapCount = members.filter((m) => placedPlayerIds.has(m.id)).length;
+                const deployedSquad = placedSquads.find((s) => s.teamKey === teamKey);
                 const roleCounts = {
                   Tank: members.filter((m) => m.role === 'Tank').length,
                   Healer: members.filter((m) => m.role === 'Healer').length,
@@ -550,14 +554,20 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                         className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 transition-colors whitespace-nowrap cursor-pointer"
                       >
                         <i className="fa-solid fa-bullseye" aria-hidden="true" />
-                        <span>Deploy Squad</span>
+                        <span>
+                          {deployedSquad
+                            ? deployedSquad.isExpanded
+                              ? 'Re-center Squad'
+                              : 'On Map (Click Name)'
+                            : 'Deploy Squad'}
+                        </span>
                       </button>
 
-                      {onMapCount > 0 && (
+                      {(deployedSquad || onMapCount > 0) && (
                         <button
                           type="button"
                           onClick={() => onRecallSquad(teamKey, members)}
-                          title="Remove squad tokens from map"
+                          title="Remove team and squad tokens from map"
                           className="inline-flex items-center justify-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-rose-500/50 hover:text-rose-300 transition-colors whitespace-nowrap cursor-pointer"
                         >
                           <i className="fa-solid fa-rotate-left" aria-hidden="true" />

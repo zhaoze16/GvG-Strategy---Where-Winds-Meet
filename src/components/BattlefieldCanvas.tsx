@@ -13,6 +13,7 @@ import {
   PathIcon,
   PlacedIcon,
   PlacedPlayer,
+  PlacedSquad,
   Player,
   PlayerRole,
   TacticalNote,
@@ -29,7 +30,10 @@ interface BattlefieldCanvasProps {
   customMapImage: string | null;
   toolMode: ToolMode;
   activeColor: string;
+  players: Player[];
   placedPlayers: PlacedPlayer[];
+  placedSquads: PlacedSquad[];
+  teamNames: Record<string, string>;
   placedIcons: PlacedIcon[];
   weaponIcons: WeaponIcon[];
   pathIcons: PathIcon[];
@@ -47,6 +51,9 @@ interface BattlefieldCanvasProps {
   onDropPlayer: (player: Player, x: number, y: number) => void;
   onMovePlayer: (id: string, x: number, y: number) => void;
   onRemovePlayer: (id: string) => void;
+  onToggleSquadExpand: (squadId: string) => void;
+  onMoveSquad: (squadId: string, x: number, y: number) => void;
+  onRemoveSquad: (squadId: string) => void;
   onMoveIcon: (id: string, x: number, y: number) => void;
   onRemoveIcon: (id: string) => void;
   onAddArrow: (arrow: Omit<DrawingArrow, 'id'>) => void;
@@ -61,6 +68,7 @@ interface BattlefieldCanvasProps {
 
 type DragTarget =
   | { kind: 'player'; id: string; offsetX: number; offsetY: number }
+  | { kind: 'squad'; id: string; offsetX: number; offsetY: number }
   | { kind: 'icon'; id: string; offsetX: number; offsetY: number }
   | { kind: 'note'; id: string; offsetX: number; offsetY: number };
 
@@ -84,7 +92,10 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
   customMapImage,
   toolMode,
   activeColor,
+  players,
   placedPlayers,
+  placedSquads,
+  teamNames,
   placedIcons,
   weaponIcons,
   pathIcons,
@@ -102,6 +113,9 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
   onDropPlayer,
   onMovePlayer,
   onRemovePlayer,
+  onToggleSquadExpand,
+  onMoveSquad,
+  onRemoveSquad,
   onMoveIcon,
   onRemoveIcon,
   onAddArrow,
@@ -142,6 +156,7 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
   } | null>(null);
   const dragRef = useRef<DragTarget | null>(null);
   const nameDownPosRef = useRef<{ id: string; x: number; y: number } | null>(null);
+  const squadDownPosRef = useRef<{ id: string; x: number; y: number } | null>(null);
   const drawingModeRef = useRef<'arrow' | 'pen' | null>(null);
   const draftArrowRef = useRef<Omit<DrawingArrow, 'id'> | null>(null);
   const draftPointsRef = useRef<{ x: number; y: number }[] | null>(null);
@@ -248,6 +263,8 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
 
         if (dragRef.current.kind === 'player') {
           onMovePlayer(dragRef.current.id, clampedX, clampedY);
+        } else if (dragRef.current.kind === 'squad') {
+          onMoveSquad(dragRef.current.id, clampedX, clampedY);
         } else if (dragRef.current.kind === 'icon') {
           onMoveIcon(dragRef.current.id, clampedX, clampedY);
         } else if (dragRef.current.kind === 'note') {
@@ -319,6 +336,7 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
     onMoveIcon,
     onMoveNote,
     onMovePlayer,
+    onMoveSquad,
   ]);
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -972,6 +990,93 @@ export const BattlefieldCanvas: React.FC<BattlefieldCanvasProps> = ({
                           onRemoveIcon(icon.id);
                         }}
                         title={`Remove ${meta.label}`}
+                        className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        style={{
+                          backgroundColor: '#e11d48',
+                          color: '#ffffff',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          border: '1px solid #0f172a',
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Layer 4.5: Placed Squad Team Markers (Center Team Name; Click to Expand/Collapse Members) */}
+              {placedSquads.map((squad) => {
+                const displayName = teamNames[squad.teamKey] || squad.teamKey;
+                const memberCount = players.filter(
+                  (p) => (p.team.trim() || 'Unassigned') === squad.teamKey
+                ).length;
+
+                return (
+                  <div
+                    key={squad.id}
+                    onMouseDown={(e) => {
+                      if (e.button !== 0 || toolMode !== 'select') return;
+                      e.stopPropagation();
+                      squadDownPosRef.current = {
+                        id: squad.id,
+                        x: e.clientX,
+                        y: e.clientY,
+                      };
+                      const pt = clientToCanvasCoords(e.clientX, e.clientY);
+                      dragRef.current = {
+                        kind: 'squad',
+                        id: squad.id,
+                        offsetX: pt.x - squad.x,
+                        offsetY: pt.y - squad.y,
+                      };
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const down = squadDownPosRef.current;
+                      squadDownPosRef.current = null;
+                      if (down && down.id === squad.id) {
+                        const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+                        if (dist >= 5) return;
+                      }
+                      onToggleSquadExpand(squad.id);
+                    }}
+                    title={
+                      squad.isExpanded
+                        ? `Click to collapse ${displayName} · Drag center to move squad`
+                        : `Click to deploy all ${memberCount} members around ${displayName} · Drag to position`
+                    }
+                    className="group absolute flex items-center justify-center"
+                    style={{
+                      left: `${squad.x}px`,
+                      top: `${squad.y}px`,
+                      transform: 'translate(-50%, -50%)',
+                      zIndex: 35,
+                      cursor: toolMode === 'select' ? 'pointer' : 'default',
+                    }}
+                  >
+                    <div
+                      className="relative flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-bold tracking-wide"
+                      style={{
+                        backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                        color: squad.isExpanded ? '#fcd34d' : '#f8fafc',
+                        border: '1.5px solid #f59e0b',
+                        boxShadow: squad.isExpanded
+                          ? '0 0 14px rgba(245, 158, 11, 0.3)'
+                          : '0 4px 12px rgba(2, 6, 23, 0.85)',
+                      }}
+                    >
+                      <span>{displayName}</span>
+
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveSquad(squad.id);
+                        }}
+                        title={`Remove ${displayName}`}
                         className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                         style={{
                           backgroundColor: '#e11d48',
