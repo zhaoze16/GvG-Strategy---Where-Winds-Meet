@@ -648,12 +648,20 @@ export default function App() {
 
   const handleAssignPlayerToTeam = useCallback((playerId: string, teamKey: string) => {
     setState((prev) => {
+      const targetPlayer = prev.players.find((p) => p.id === playerId);
+      const oldTeamKey = targetPlayer ? targetPlayer.team.trim() || 'Unassigned' : '';
+      const wasInOldExpanded =
+        oldTeamKey !== teamKey &&
+        prev.placedSquads.some((s) => s.teamKey === oldTeamKey && s.isExpanded);
+
       const nextPlayers = prev.players.map((p) =>
         p.id === playerId ? { ...p, team: teamKey } : p
       );
-      let nextPlaced = prev.placedPlayers.map((p) =>
-        p.playerId === playerId ? { ...p, team: teamKey } : p
-      );
+      let nextPlaced = wasInOldExpanded
+        ? prev.placedPlayers.filter((p) => p.playerId !== playerId)
+        : prev.placedPlayers.map((p) =>
+            p.playerId === playerId ? { ...p, team: teamKey } : p
+          );
 
       const expandedSquad = prev.placedSquads.find(
         (s) => s.teamKey === teamKey && s.isExpanded
@@ -696,8 +704,14 @@ export default function App() {
         });
       }
 
+      const nextTeamNames =
+        teamKey && teamKey !== 'Unassigned' && !prev.teamNames[teamKey]
+          ? { ...prev.teamNames, [teamKey]: teamKey }
+          : prev.teamNames;
+
       return {
         ...prev,
+        teamNames: nextTeamNames,
         players: nextPlayers,
         placedPlayers: nextPlaced,
       };

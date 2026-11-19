@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MAP_ICONS_META, ROLE_META, TACTICAL_COLORS } from '../data/defaultRoster';
 import {
   MapIconType,
@@ -90,6 +90,15 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onQuickUploadMapObjectIcon,
 }) => {
   const [unitSearch, setUnitSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | PlayerRole>('ALL');
+  const [teamFilter, setTeamFilter] = useState<string>('ALL');
+  const [loadoutFilter, setLoadoutFilter] = useState<string>('ALL');
+  const [unitContextMenu, setUnitContextMenu] = useState<{
+    playerId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [quickMenuTeamName, setQuickMenuTeamName] = useState('');
   const [editingTeamKey, setEditingTeamKey] = useState<string | null>(null);
   const [teamDraftName, setTeamDraftName] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
@@ -97,6 +106,25 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const [memberPickSearch, setMemberPickSearch] = useState('');
   const quickFileInputRef = useRef<HTMLInputElement>(null);
   const quickTargetTypeRef = useRef<MapIconType | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!unitContextMenu) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setUnitContextMenu(null);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setUnitContextMenu(null);
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [unitContextMenu]);
 
   const placedPlayerIds = useMemo(
     () => new Set(placedPlayers.map((p) => p.playerId)),
@@ -105,16 +133,29 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   const filteredUnits = useMemo(() => {
     const q = unitSearch.trim().toLowerCase();
-    if (!q) return players;
-    return players.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.role.toLowerCase().includes(q) ||
-        p.team.toLowerCase().includes(q) ||
-        p.weapon1.toLowerCase().includes(q) ||
-        p.weapon2.toLowerCase().includes(q)
-    );
-  }, [players, unitSearch]);
+    return players.filter((p) => {
+      if (roleFilter !== 'ALL' && p.role !== roleFilter) return false;
+      if (teamFilter === 'UNASSIGNED' && p.team.trim() !== '') return false;
+      if (
+        teamFilter !== 'ALL' &&
+        teamFilter !== 'UNASSIGNED' &&
+        (p.team.trim() || 'Unassigned') !== teamFilter
+      ) {
+        return false;
+      }
+      if (loadoutFilter !== 'ALL') {
+        const lf = loadoutFilter.toLowerCase();
+        const matchesLoadout =
+          (p.path1 || '').trim().toLowerCase() === lf ||
+          (p.path2 || '').trim().toLowerCase() === lf ||
+          p.weapon1.trim().toLowerCase() === lf ||
+          p.weapon2.trim().toLowerCase() === lf;
+        if (!matchesLoadout) return false;
+      }
+      if (q && !p.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [loadoutFilter, players, roleFilter, teamFilter, unitSearch]);
 
   const groupedSquads = useMemo(() => {
     const map = new Map<string, Player[]>();
@@ -319,35 +360,162 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 </span>
               </div>
 
-              <div className="relative">
-                <i
-                  className="fa-solid fa-magnifying-glass pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500"
-                  aria-hidden="true"
-                />
-                <input
-                  type="text"
-                  value={unitSearch}
-                  onChange={(e) => setUnitSearch(e.target.value)}
-                  placeholder="Filter units by name, role, weapon..."
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pl-8 pr-3 text-xs text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
-                />
+              {/* Filters Above Search */}
+              <div className="space-y-1.5">
+                {/* Role Filter Pills */}
+                <div className="grid grid-cols-5 gap-0.5 rounded-lg border border-slate-800 bg-slate-950 p-0.5">
+                  {(
+                    [
+                      { key: 'ALL', label: 'All', title: 'All Roles' },
+                      { key: 'DPS', label: 'DPS', title: 'DPS' },
+                      { key: 'Tank', label: 'Tank', title: 'Tank' },
+                      { key: 'Healer', label: 'Healer', title: 'Healer' },
+                      { key: 'Support', label: 'Supp', title: 'Support' },
+                    ] as const
+                  ).map((item) => {
+                    const active = roleFilter === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        title={item.title}
+                        onClick={() => setRoleFilter(item.key)}
+                        className={`rounded-md py-1 text-[10px] font-semibold transition-colors cursor-pointer ${
+                          active
+                            ? 'bg-slate-800 text-amber-300'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Team & Weapon/Path Dropdown Filters */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <select
+                    value={teamFilter}
+                    onChange={(e) => setTeamFilter(e.target.value)}
+                    aria-label="Filter by Team"
+                    className="min-w-0 rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Teams</option>
+                    <option value="UNASSIGNED">Unassigned</option>
+                    {groupedSquads
+                      .filter(([key]) => key !== 'Unassigned')
+                      .map(([key]) => (
+                        <option key={key} value={key}>
+                          {teamNames[key] || key}
+                        </option>
+                      ))}
+                  </select>
+
+                  <select
+                    value={loadoutFilter}
+                    onChange={(e) => setLoadoutFilter(e.target.value)}
+                    aria-label="Filter by Path or Weapon"
+                    className="min-w-0 rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Weapons/Paths</option>
+                    {pathIcons.length > 0 && (
+                      <optgroup label="Paths">
+                        {pathIcons.map((p) => (
+                          <option key={p.id} value={p.name}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {weaponIcons.length > 0 && (
+                      <optgroup label="Weapons">
+                        {weaponIcons.map((w) => (
+                          <option key={w.id} value={w.name}>
+                            {w.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+
+                {/* Search by Player Name Only */}
+                <div className="relative">
+                  <i
+                    className="fa-solid fa-magnifying-glass pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500"
+                    aria-hidden="true"
+                  />
+                  <input
+                    type="text"
+                    value={unitSearch}
+                    onChange={(e) => setUnitSearch(e.target.value)}
+                    placeholder="Search player name..."
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-1.5 pl-8 pr-7 text-xs text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                  />
+                  {unitSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setUnitSearch('')}
+                      title="Clear search"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                    >
+                      <i className="fa-solid fa-xmark text-[11px]" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+
+                {(roleFilter !== 'ALL' ||
+                  teamFilter !== 'ALL' ||
+                  loadoutFilter !== 'ALL' ||
+                  unitSearch.trim() !== '') && (
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 px-0.5">
+                    <span>
+                      Showing {filteredUnits.length} of {players.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoleFilter('ALL');
+                        setTeamFilter('ALL');
+                        setLoadoutFilter('ALL');
+                        setUnitSearch('');
+                      }}
+                      className="text-amber-400 hover:text-amber-300 cursor-pointer"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                )}
               </div>
 
               {filteredUnits.length === 0 ? (
                 <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-center text-xs text-slate-400">
-                  No units match your search. Open Manage Roster to add members.
+                  No units match your filter. Adjust filters above or open Manage Roster.
                 </div>
               ) : (
                 <div className="space-y-1.5">
                   {filteredUnits.map((player) => {
                     const roleMeta = ROLE_META[player.role];
                     const isPlaced = placedPlayerIds.has(player.id);
+                    const teamDisplay = player.team.trim()
+                      ? teamNames[player.team.trim()] || player.team.trim()
+                      : '';
                     return (
                       <div
                         key={player.id}
                         draggable
                         onDragStart={(e) => startDragPlayer(e, player)}
                         onClick={() => onSpawnPlayerCenter(player)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setQuickMenuTeamName('');
+                          setUnitContextMenu({
+                            playerId: player.id,
+                            x: Math.min(e.clientX, window.innerWidth - 240),
+                            y: Math.min(e.clientY, window.innerHeight - 290),
+                          });
+                        }}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
@@ -356,8 +524,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                             onSpawnPlayerCenter(player);
                           }
                         }}
-                        title="Drag onto map coordinates or click to spawn at center"
-                        className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/75 px-2.5 py-2 hover:border-blue-500/50 hover:bg-slate-800/70 transition-colors cursor-grab active:cursor-grabbing"
+                        title="Drag/click to spawn · Right-click to add/assign to Team"
+                        className="group flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/75 px-2.5 py-2 hover:border-blue-500/50 hover:bg-slate-800/70 transition-colors cursor-grab active:cursor-grabbing"
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
                           <span
@@ -383,6 +551,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                               <span className="truncate text-xs font-semibold text-slate-100">
                                 {player.name}
                               </span>
+                              {teamDisplay && (
+                                <span className="truncate rounded bg-slate-800/90 px-1 py-0.5 text-[9px] font-medium text-amber-300/90 shrink-0 max-w-[78px]">
+                                  {teamDisplay}
+                                </span>
+                              )}
                               {isPlaced && (
                                 <span className="text-[10px] font-medium text-emerald-400 shrink-0">
                                   On Map
@@ -435,10 +608,30 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                           </div>
                         </div>
 
-                        <i
-                          className="fa-solid fa-grip-vertical text-xs text-slate-600 shrink-0"
-                          aria-hidden="true"
-                        />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setQuickMenuTeamName('');
+                              setUnitContextMenu({
+                                playerId: player.id,
+                                x: Math.min(rect.right + 4, window.innerWidth - 240),
+                                y: Math.min(rect.top, window.innerHeight - 290),
+                              });
+                            }}
+                            title="Add / Assign to Team (or right-click)"
+                            aria-label={`Assign ${player.name} to team`}
+                            className="flex h-5 w-5 items-center justify-center rounded border border-slate-700 bg-slate-900 text-slate-400 opacity-0 group-hover:opacity-100 hover:border-amber-500/60 hover:text-amber-300 transition-opacity cursor-pointer"
+                          >
+                            <i className="fa-solid fa-user-plus text-[9px]" aria-hidden="true" />
+                          </button>
+                          <i
+                            className="fa-solid fa-grip-vertical text-xs text-slate-600"
+                            aria-hidden="true"
+                          />
+                        </div>
                       </div>
                     );
                   })}
@@ -890,6 +1083,124 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           </section>
         )}
       </div>
+
+      {/* Right-click / Quick Assign Team Context Menu */}
+      {unitContextMenu && (() => {
+        const activePlayer = players.find((p) => p.id === unitContextMenu.playerId);
+        if (!activePlayer) return null;
+        const availableTeams = groupedSquads
+          .map(([k]) => k)
+          .filter((k) => k !== 'Unassigned');
+        const currentTeamKey = activePlayer.team.trim();
+
+        return (
+          <div
+            ref={contextMenuRef}
+            style={{ left: `${unitContextMenu.x}px`, top: `${unitContextMenu.y}px` }}
+            className="fixed z-50 w-56 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-2xl space-y-1.5"
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+              <div className="min-w-0">
+                <div className="truncate text-xs font-semibold text-slate-100">
+                  {activePlayer.name}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  {currentTeamKey
+                    ? `Team: ${teamNames[currentTeamKey] || currentTeamKey}`
+                    : 'Unassigned'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUnitContextMenu(null)}
+                className="text-slate-500 hover:text-slate-200 cursor-pointer"
+              >
+                <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Add / Assign to Team
+            </div>
+
+            <div className="max-h-40 overflow-y-auto space-y-0.5 pr-0.5">
+              {availableTeams.length === 0 ? (
+                <div className="py-1.5 text-[11px] text-slate-500">
+                  No teams yet. Create one below.
+                </div>
+              ) : (
+                availableTeams.map((tKey) => {
+                  const tName = teamNames[tKey] || tKey;
+                  const isCurrent = currentTeamKey === tKey;
+                  return (
+                    <button
+                      key={tKey}
+                      type="button"
+                      onClick={() => {
+                        onAssignPlayerToTeam(activePlayer.id, tKey);
+                        setUnitContextMenu(null);
+                      }}
+                      className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs transition-colors cursor-pointer ${
+                        isCurrent
+                          ? 'bg-blue-600/25 text-amber-300 font-semibold'
+                          : 'text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="truncate">{tName}</span>
+                      {isCurrent && (
+                        <i className="fa-solid fa-check text-[10px] shrink-0" aria-hidden="true" />
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {currentTeamKey && (
+              <button
+                type="button"
+                onClick={() => {
+                  onRemovePlayerFromTeam(activePlayer.id);
+                  setUnitContextMenu(null);
+                }}
+                className="flex w-full items-center gap-1.5 rounded border border-rose-500/30 bg-rose-950/30 px-2 py-1 text-left text-[11px] font-medium text-rose-300 hover:bg-rose-900/50 transition-colors cursor-pointer"
+              >
+                <i className="fa-solid fa-user-minus text-[10px]" aria-hidden="true" />
+                <span>Remove from Team</span>
+              </button>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = quickMenuTeamName.trim();
+                if (!trimmed || trimmed.toLowerCase() === 'unassigned') return;
+                onCreateTeam(trimmed);
+                onAssignPlayerToTeam(activePlayer.id, trimmed);
+                setQuickMenuTeamName('');
+                setUnitContextMenu(null);
+              }}
+              className="flex items-center gap-1 border-t border-slate-800 pt-1.5"
+            >
+              <input
+                type="text"
+                value={quickMenuTeamName}
+                onChange={(e) => setQuickMenuTeamName(e.target.value)}
+                placeholder="New team name..."
+                className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!quickMenuTeamName.trim()}
+                title="Create new team and add player"
+                className="shrink-0 rounded bg-amber-500 px-2 py-1 text-[11px] font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-40 cursor-pointer"
+              >
+                +
+              </button>
+            </form>
+          </div>
+        );
+      })()}
     </aside>
   );
 };
